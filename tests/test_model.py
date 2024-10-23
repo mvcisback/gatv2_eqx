@@ -1,5 +1,5 @@
-import numpy as np
 import jax
+import jax.numpy as jnp
 
 import equinox as eqx
 from dict_lookup_mpnn_problem import gen_problems
@@ -12,12 +12,12 @@ def test_smoke():
     key_init, key_call = jax.random.split(key)
     model = GATv2Layer(n_features=4, key=key_init)
 
-    adj = np.array([[0., 1., 1.],
-                    [1., 0., 0.],
-                    [0., 1., 0.]])
+    adj = jnp.array([[0., 1., 1.],
+                     [1., 0., 0.],
+                     [0., 1., 0.]])
 
     # Each node has the unit vector as its feature.
-    nodes = np.eye(3, 4)
+    nodes = jnp.eye(3, 4)
     def f(nodes, key):
         key1, key2 = jax.random.split(key)
         nodes = model(h=nodes, adj_mat=adj, key=key1)
@@ -41,7 +41,7 @@ def test_dict_lookup():
 
     def loss(model, *, answers, adj, key, n=3):
         keys = jax.random.split(key, n)
-        nodes = problem.nodes
+        nodes = jnp.array(problem.nodes)
         for key in keys:
             nodes = messenger(h=nodes, adj_mat=adj, key=key)
         guess = jax.vmap(decoder)(nodes)
@@ -49,8 +49,9 @@ def test_dict_lookup():
 
     problems = gen_problems(n_keys=3, n_vals=5, seed=0)
     problem = next(problems)
+    adj = jnp.array(problem.adj)
 
-    loss(model, answers=problem.answers, adj=problem.adj, key=key_call)
+    loss(model, answers=problem.answers, adj=adj, key=key_call)
 
     df = jax.jit(jax.grad(loss))
-    df(model, answers=problem.answers, adj=problem.adj, key=key_call)
+    df(model, answers=problem.answers, adj=adj, key=key_call)
