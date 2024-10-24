@@ -4,13 +4,13 @@ import jax.numpy as jnp
 import equinox as eqx
 from dict_lookup_mpnn_problem import gen_problems
 
-from gatv2_eqx import GATv2Layer
+from gatv2_eqx import GATv2, GATv2Layer
 
 
 def test_smoke():
     key = jax.random.PRNGKey(0)
     key_init, key_call = jax.random.split(key)
-    model = GATv2Layer(n_features=4, key=key_init)
+    model = GATv2(n_features=4, key=key_init)
 
     adj = jnp.array([[0., 1., 1.],
                      [1., 0., 0.],
@@ -20,8 +20,7 @@ def test_smoke():
     nodes = jnp.eye(3, 4)
     def f(nodes, key):
         key1, key2 = jax.random.split(key)
-        nodes = model(h=nodes, adj_mat=adj, key=key1)
-        nodes = model(h=nodes, adj_mat=adj, key=key2)
+        nodes = model(nodes=nodes, adj_mat=adj, n_iters=3, key=key1)
         return nodes.sum()
 
     f(nodes, key_call)
@@ -43,7 +42,7 @@ def test_dict_lookup():
         keys = jax.random.split(key, n)
         nodes = jnp.array(problem.nodes)
         for key in keys:
-            nodes = messenger(h=nodes, adj_mat=adj, key=key)
+            nodes = messenger(nodes=nodes, adj_mat=adj, key=key)
         guess = jax.vmap(decoder)(nodes)
         return ((answers - guess)**2).mean()
 

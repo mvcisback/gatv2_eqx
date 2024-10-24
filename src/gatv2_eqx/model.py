@@ -3,7 +3,7 @@
 Implementation of GATv2 from https://arxiv.org/abs/2105.14491.
 """
 
-__all__ = ["GATv2Layer"]  # Public API
+__all__ = ["GATv2", "GATv2Layer"]  # Public API
 
 import einops
 import equinox as eqx
@@ -35,13 +35,13 @@ class GATv2Layer(eqx.Module):
         self.to_score = eqx.nn.Linear(n_features, 1, use_bias=False, key=key3)
 
     def __call__(self,
-                 h: Float[Array, "node channel"],
+                 nodes: Float[Array, "node channel"],
                  adj_mat: Float[Array, "node node"],
                  *,
                  key: PRNGKeyArray) -> Float[Array, "node channel"]:
         # Apply linear projects to each node.
-        g_src: Float[Array, "node channel"] = jax.vmap(self.W_src)(h)
-        g_tgt: Float[Array, "node channel"] = jax.vmap(self.W_tgt)(h)
+        g_src: Float[Array, "node channel"] = jax.vmap(self.W_src)(nodes)
+        g_tgt: Float[Array, "node channel"] = jax.vmap(self.W_tgt)(nodes)
 
         # Create scores of each src given tgt.
         #   g[i, j] = σ(g_src[i] + g_src[j])
@@ -52,7 +52,7 @@ class GATv2Layer(eqx.Module):
         # TODO: Is there a way to avoid flattening and unflattening.
         score: Float[Array, "node node"]
         _score = jax.vmap(self.to_score)(einops.rearrange(g, "tgt src c -> (tgt src) c"))
-        score = einops.rearrange(_score, "(tgt src) () -> tgt src", tgt=h.shape[0])
+        score = einops.rearrange(_score, "(tgt src) () -> tgt src", tgt=nodes.shape[0])
 
         # Each target node normalized across the src dimension.
         mask = jnp.zeros_like(score)
@@ -62,3 +62,31 @@ class GATv2Layer(eqx.Module):
 
         # Average each g_tgt[i] with weights[i].
         return weights @ g_tgt
+
+
+class GATv2(eqx.Module):
+    send_recieve: GATv2Layer
+    dropout: eqx.nn.Dropout
+
+    def __init__(self,
+                 n_features: int,
+                 *,
+                 dropout_prob: float = 0.0,
+                 leaky_relu_negative_slope: float = 0.2,
+                 key: PRNGKeyArray):
+        relu_slope = leaky_relu_negative_slope
+        self.dropout = eqx.nn.Dropout(dropout_prob)
+        self.send_recieve = GATv2Layer(n_features,
+                                       leaky_relu_negative_slope=relu_slope,
+                                       key=key)
+
+    def __call__(self,
+                 nodes: Float[Array, "node channel"],
+                 adj_mat: Float[Array, "node node"],
+                 n_iters: int,
+                 *,
+                 key: PRNGKeyArray) -> Float[Array, "node channel"]:
+        for key in jax.random.split(key, n_iters):
+            nodes = self.dropout(nodes)
+            nodes = self.send_recieve(nodes, adj_mat, key=key)
+        return nodes
