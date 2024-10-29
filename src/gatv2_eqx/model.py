@@ -56,7 +56,7 @@ class GATv2Layer(eqx.Module):
 
         # Each target node normalized across the src dimension.
         mask = jnp.zeros_like(score)
-        mask = jnp.where(adj_mat == 0, mask, -float('inf'))
+        mask = jnp.where(adj_mat != 0, mask, -float('inf'))
         weights: Float[Array, "node node"]  # tgt -> attention over src.
         weights = jax.nn.softmax(score + mask, axis=1)
 
