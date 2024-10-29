@@ -5,6 +5,8 @@ Implementation of GATv2 from https://arxiv.org/abs/2105.14491.
 
 __all__ = ["GATv2", "GATv2Layer"]  # Public API
 
+from typing import Optional
+
 import einops
 import equinox as eqx
 import jax
@@ -38,7 +40,7 @@ class GATv2Layer(eqx.Module):
                  nodes: Float[Array, "node channel"],
                  adj_mat: Float[Array, "node node"],
                  *,
-                 key: PRNGKeyArray) -> Float[Array, "node channel"]:
+                 key: Optional[PRNGKeyArray] = None) -> Float[Array, "node channel"]:
         # Apply linear projects to each node.
         g_src: Float[Array, "node channel"] = jax.vmap(self.W_src)(nodes)
         g_tgt: Float[Array, "node channel"] = jax.vmap(self.W_tgt)(nodes)

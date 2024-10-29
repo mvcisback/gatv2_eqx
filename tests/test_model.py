@@ -34,15 +34,13 @@ def test_dict_lookup():
     key = jax.random.PRNGKey(0)
     key_messenger, key_decoder, key_call = jax.random.split(key, 3)
 
-    messenger = GATv2Layer(n_features=3+5, key=key_messenger)
+    gnn = GATv2(n_features=3+5, key=key_messenger)
     decoder = eqx.nn.Linear(3+5, 1, key=key_decoder) 
-    model = (messenger, decoder)
+    model = (gnn, decoder)
 
     def loss(model, *, answers, adj, key, n=3):
-        keys = jax.random.split(key, n)
         nodes = jnp.array(problem.nodes)
-        for key in keys:
-            nodes = messenger(nodes=nodes, adj_mat=adj, key=key)
+        nodes = gnn(nodes=nodes, adj_mat=adj, n_iters=3, key=key)
         guess = jax.vmap(decoder)(nodes)
         return ((answers - guess)**2).mean()
 
