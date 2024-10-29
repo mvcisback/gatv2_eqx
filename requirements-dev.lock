@@ -10,6 +10,9 @@
 #   universal: false
 
 -e file:.
+absl-py==2.1.0
+    # via chex
+    # via optax
 beartype==0.19.0
     # via gatv2-eqx
 blessed==1.20.0
@@ -19,17 +22,21 @@ certifi==2024.8.30
     # via requests
 charset-normalizer==3.4.0
     # via requests
+chex==0.1.87
+    # via optax
 curtsies==0.4.2
     # via bpython
 cwcwidth==0.1.9
     # via bpython
     # via curtsies
-dict-lookup-mpnn-problem==0.1.0
-    # via gatv2-eqx
+dict-lookup-mpnn-problem @ file:///home/mvc/work/gatv2/../dict_lookup_mpnn_problem
 einops==0.8.0
     # via gatv2-eqx
 equinox==0.11.8
     # via gatv2-eqx
+etils==1.10.0
+    # via optax
+funcy==2.0
 greenlet==3.1.1
     # via bpython
 idna==3.10
@@ -37,14 +44,18 @@ idna==3.10
 iniconfig==2.0.0
     # via pytest
 jax==0.4.34
+    # via chex
     # via equinox
     # via gatv2-eqx
+    # via optax
 jax-cuda12-pjrt==0.4.34
     # via jax-cuda12-plugin
 jax-cuda12-plugin==0.4.34
     # via jax
 jaxlib==0.4.34
+    # via chex
     # via jax
+    # via optax
 jaxtyping==0.2.34
     # via equinox
     # via gatv2-eqx
@@ -52,10 +63,12 @@ ml-dtypes==0.5.0
     # via jax
     # via jaxlib
 numpy==2.1.2
+    # via chex
     # via dict-lookup-mpnn-problem
     # via jax
     # via jaxlib
     # via ml-dtypes
+    # via optax
     # via scipy
 nvidia-cublas-cu12==12.6.3.3
     # via jax-cuda12-plugin
@@ -85,6 +98,7 @@ nvidia-nvjitlink-cu12==12.6.77
     # via nvidia-cusparse-cu12
 opt-einsum==3.4.0
     # via jax
+optax==0.2.3
 packaging==24.1
     # via pytest
 pluggy==1.5.0
@@ -99,12 +113,18 @@ requests==2.32.3
 scipy==1.14.1
     # via jax
     # via jaxlib
+setuptools==75.2.0
+    # via chex
 six==1.16.0
     # via blessed
+toolz==1.0.0
+    # via chex
 typeguard==2.13.3
     # via jaxtyping
 typing-extensions==4.12.2
+    # via chex
     # via equinox
+    # via etils
 urllib3==2.2.3
     # via requests
 wcwidth==0.2.13

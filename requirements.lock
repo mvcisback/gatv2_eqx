@@ -12,8 +12,6 @@
 -e file:.
 beartype==0.19.0
     # via gatv2-eqx
-dict-lookup-mpnn-problem==0.1.0
-    # via gatv2-eqx
 einops==0.8.0
     # via gatv2-eqx
 equinox==0.11.8
@@ -34,7 +32,6 @@ ml-dtypes==0.5.0
     # via jax
     # via jaxlib
 numpy==2.1.2
-    # via dict-lookup-mpnn-problem
     # via jax
     # via jaxlib
     # via ml-dtypes

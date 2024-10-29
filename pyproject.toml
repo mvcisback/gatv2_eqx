@@ -9,7 +9,6 @@ dependencies = [
     "jax[cuda12]>=0.4.34",
     "jaxtyping>=0.2.34",
     "beartype>=0.19.0",
-    "dict-lookup-mpnn-problem>=0.1.0",
     "equinox>=0.11.8",
     "einops>=0.8.0",
 ]
@@ -25,6 +24,9 @@ managed = true
 dev-dependencies = [
     "pytest>=8.3.3",
     "bpython>=0.24",
+    "optax>=0.2.3",
+    "funcy>=2.0",
+    "dict-lookup-mpnn-problem @ file:///home/mvc/work/gatv2/../dict_lookup_mpnn_problem",
 ]
 
 [tool.hatch.metadata]
