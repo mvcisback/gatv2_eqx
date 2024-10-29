@@ -5,7 +5,7 @@ Implementation of GATv2 from https://arxiv.org/abs/2105.14491.
 
 __all__ = ["GATv2", "GATv2Layer"]  # Public API
 
-from typing import Optional
+from typing import Protocol
 
 import einops
 import equinox as eqx
@@ -40,7 +40,7 @@ class GATv2Layer(eqx.Module):
                  nodes: Float[Array, "node channel"],
                  adj_mat: Float[Array, "node node"],
                  *,
-                 key: Optional[PRNGKeyArray] = None) -> Float[Array, "node channel"]:
+                 key: PRNGKeyArray | None = None) -> Float[Array, "node channel"]:
         # Apply linear projects to each node.
         g_src: Float[Array, "node channel"] = jax.vmap(self.W_src)(nodes)
         g_tgt: Float[Array, "node channel"] = jax.vmap(self.W_tgt)(nodes)
@@ -66,21 +66,37 @@ class GATv2Layer(eqx.Module):
         return weights @ g_tgt
 
 
+class LayerPostProcessor(Protocol):
+    def __call__(self, nodes: Float[Array, "node channel"],
+                 key: PRNGKeyArray) -> Float[Array, "node channel"]:
+        ...
+
+
 class GATv2(eqx.Module):
     send_recieve: GATv2Layer
-    dropout: eqx.nn.Dropout
+    layer_post_processor: LayerPostProcessor
+    dropout: eqx.nn.Dropout = eqx.static_field()
 
     def __init__(self,
                  n_features: int,
                  *,
                  dropout_prob: float = 0.0,
                  leaky_relu_negative_slope: float = 0.2,
+                 layer_post_processor: LayerPostProcessor | None = None,
                  key: PRNGKeyArray):
         relu_slope = leaky_relu_negative_slope
         self.dropout = eqx.nn.Dropout(dropout_prob)
+
+        key_mlp, key_gat = jax.random.split(key)
+
+        if layer_post_processor is None:
+            self.layer_post_processor = eqx.nn.Identity()
+        else:
+            self.layer_post_processor = layer_post_processor
+
         self.send_recieve = GATv2Layer(n_features,
                                        leaky_relu_negative_slope=relu_slope,
-                                       key=key)
+                                       key=key_gat)
 
     def __call__(self,
                  nodes: Float[Array, "node channel"],
@@ -89,6 +105,7 @@ class GATv2(eqx.Module):
                  *,
                  key: PRNGKeyArray) -> Float[Array, "node channel"]:
         for key in jax.random.split(key, n_iters):
-            nodes = self.dropout(nodes)
-            nodes = self.send_recieve(nodes, adj_mat, key=key)
+            key1, key2 = jax.random.split(key)
+            nodes = self.send_recieve(nodes, adj_mat, key=key1)
+            nodes = self.layer_post_processor(nodes, key=key2)
         return nodes
