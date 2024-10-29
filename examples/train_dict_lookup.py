@@ -15,11 +15,6 @@ from jaxtyping import Array, Float, Int, PRNGKeyArray, PyTree, jaxtyped
 from gatv2_eqx import GATv2
 
 
-jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")
-jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
-jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
-
-
 # Make Problem a Pytree and thus jit-able.
 jax.tree_util.register_pytree_node(
     nodetype=Problem,
