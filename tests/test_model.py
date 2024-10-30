@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import equinox as eqx
 from dict_lookup_mpnn_problem import gen_problems
 
-from gatv2_eqx import GATv2, GATv2Layer
+from gatv2_eqx import GATv2
 
 
 def test_smoke():

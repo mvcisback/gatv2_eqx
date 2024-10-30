@@ -1,7 +1,8 @@
+# ruff: noqa: F722
+
 import dataclasses
 from typing import Sequence
 
-import einops
 import equinox as eqx
 import funcy as fn
 import jax
@@ -10,7 +11,7 @@ import optax
 from beartype import beartype
 from dict_lookup_mpnn_problem import gen_problems
 from dict_lookup_mpnn_problem.generate import Problem
-from jaxtyping import Array, Float, Int, PRNGKeyArray, PyTree, jaxtyped
+from jaxtyping import Array, Float, PRNGKeyArray, PyTree, jaxtyped
 
 from gatv2_eqx import GATv2
 
