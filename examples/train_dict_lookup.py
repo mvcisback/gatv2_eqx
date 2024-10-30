@@ -1,27 +1,49 @@
-# ruff: noqa: F722
+# ruff: noqa: F722,F821
 
 import dataclasses
+from functools import partial
 from typing import Sequence
 
 import equinox as eqx
 import funcy as fn
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax 
 from beartype import beartype
 from dict_lookup_mpnn_problem import gen_problems
 from dict_lookup_mpnn_problem.generate import Problem
-from jaxtyping import Array, Float, PRNGKeyArray, PyTree, jaxtyped
+from jaxtyping import Array, Float, Int, PRNGKeyArray, PyTree, jaxtyped
 
 from gatv2_eqx import GATv2
 
 
-# Make Problem a Pytree and thus jit-able.
-jax.tree_util.register_pytree_node(
-    nodetype=Problem,
-    flatten_func=lambda p: (dataclasses.astuple(p), ()),
-    unflatten_func=lambda _, args: Problem(*args)
-)
+def pad_problem(problem: Problem, target_nodes: int) -> Problem:
+    n, channels = problem.nodes.shape
+    nodes = np.zeros((target_nodes, channels))
+    nodes[:n] = problem.nodes
+    adj = np.eye(target_nodes)
+    adj[:n,:n] = problem.adj
+
+    # HACK: fake answers are negative.
+    answers = -np.ones((target_nodes >> 1), dtype=np.int32)
+    answers[:len(problem.answers)] = problem.answers
+
+    return dataclasses.replace(problem, nodes=nodes, adj=adj, answers=answers)
+
+
+type ProblemBatch = tuple[
+    Float[Array, "batch nodes channel"],
+    Float[Array, "batch nodes nodes"],
+    Int[Array, "batch+nodes"],
+]
+
+
+def merge_batch(problems: Sequence[Problem]) -> ProblemBatch:
+    nodes = jnp.stack([p.nodes for p in problems])
+    adj = jnp.stack([p.adj for p in problems])
+    answers = jnp.stack([p.answers for p in problems])
+    return (nodes, adj, answers)
 
 
 @jaxtyped(typechecker=beartype)
@@ -70,28 +92,28 @@ class LookUpNetwork(eqx.Module):
               jax_seed: int = 0,
               problems_seed: int = 2):
 
-        def loss(problem: Problem, *,
-                 model: LookUpNetwork,
-                 key: PRNGKeyArray) -> float:
-            answers = jnp.array(problem.answers)
-            log_beliefs = model(nodes=jnp.array(problem.nodes),
-                                adj=jnp.array(problem.adj),
-                                key=key)
-            # Cross entropy loss, i.e., average surprisal of the answers.
-            return jax.vmap(lambda a, logp: -logp[a])(answers, log_beliefs) \
-                      .mean()
+        def loss(nodes: Float[Array, "batch nodes channel"],
+                 adj: Float[Array, "batch nodes nodes"],
+                 answers: Int[Array, "batch nodes"],
+                 key: PRNGKeyArray,
+                 *,
+                 model: LookUpNetwork) -> float:
+            log_beliefs = model(nodes=nodes, adj=adj, key=key)
 
+            # Cross entropy loss, i.e., average surprisal of the answers.
+            losses = jax.vmap(lambda a, logp: -logp[a])(answers, log_beliefs)
+            losses = jnp.where(answers >= 0, losses, 0.)
+            return losses.mean()
 
         def batch_loss(model: LookUpNetwork,
-                       problems: Sequence[Problem],
+                       nodes: Float[Array, "batch nodes channel"],
+                       adj: Float[Array, "batch nodes nodes"],
+                       answers: Int[Array, "batch nodes"],
                        key: PRNGKeyArray) -> float:
-            # TODO: Implement padding via isolated nodes
-            #       in order to vmap.
-            keys = jax.random.split(key, len(problems))
-            tmp = 0
-            for p, key in zip(problems, keys):
-               tmp += loss(p, model=model, key=key)
-            return tmp / len(problems)
+            n_batches = nodes.shape[0]
+            keys = jax.random.split(key, n_batches)
+            losses = jax.vmap(partial(loss, model=model))
+            return losses(nodes, adj, answers, keys).mean()
 
         loss_and_grad = eqx.filter_value_and_grad(batch_loss)
 
@@ -106,29 +128,37 @@ class LookUpNetwork(eqx.Module):
         opt_state = optim.init(eqx.filter(model, eqx.is_array))
 
         dataset = gen_problems(n_keys=n_keys, n_vals=n_vals, seed=problems_seed)
+
+        # Create training batches and test set.
+        #
+        # For jit performance reasons these are padded to have the same
+        # number of nodes and stacked together.
+        dataset = map(partial(pad_problem, target_nodes=2*n_keys), dataset)
         test = fn.take(100, dataset)
+        test = merge_batch(test)
         batches = fn.chunks(batch_size, dataset)
-        batch = next(batches)
+        batches = map(merge_batch, batches)
 
         @eqx.filter_jit
         def make_step(model: LookUpNetwork,
                       opt_state: PyTree,
-                      batch: Sequence[Problem],
+                      nodes: Float[Array, "batch nodes channel"],
+                      adj: Float[Array, "batch nodes nodes"],
+                      answers: Int[Array, "batch nodes"],
                       key: PRNGKeyArray):
             key1, key2 = jax.random.split(key)
-            val, grads = loss_and_grad(model, batch, key1)
+            val, grads = loss_and_grad(model, nodes, adj, answers, key=key1)
             updates, opt_state = optim.update(
                 grads, opt_state, eqx.filter(model, eqx.is_array)
             )
-            test_loss = batch_loss(model, test, key2)
+            test_loss = batch_loss(model, *test, key=key2)
             model = eqx.apply_updates(model, updates)
-            # TODO
             return model, opt_state, val, test_loss
 
 
-        for i, (epoch_key, _) in enumerate(zip(keys, batches)):
+        for i, (epoch_key, batch) in enumerate(zip(keys, batches)):
             print(f"epoch: {i}")
-            model, opt_state, val, test_loss = make_step(model, opt_state, batch, epoch_key)
+            model, opt_state, val, test_loss = make_step(model, opt_state, *batch, key=epoch_key)
             print(f"loss: {val}, test_loss: {test_loss}")
 
 
