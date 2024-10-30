@@ -73,7 +73,7 @@ class LayerPostProcessor(Protocol):
 
 
 class GATv2(eqx.Module):
-    send_recieve: GATv2Layer
+    send_receive: GATv2Layer
     layer_post_processor: LayerPostProcessor
     dropout: eqx.nn.Dropout = eqx.static_field()
 
@@ -94,7 +94,7 @@ class GATv2(eqx.Module):
         else:
             self.layer_post_processor = layer_post_processor
 
-        self.send_recieve = GATv2Layer(n_features,
+        self.send_receive = GATv2Layer(n_features,
                                        leaky_relu_negative_slope=relu_slope,
                                        key=key_gat)
 
@@ -106,6 +106,6 @@ class GATv2(eqx.Module):
                  key: PRNGKeyArray) -> Float[Array, "node channel"]:
         for key in jax.random.split(key, n_iters):
             key1, key2 = jax.random.split(key)
-            nodes = self.send_recieve(nodes, adj_mat, key=key1)
+            nodes = self.send_receive(nodes, adj_mat, key=key1)
             nodes = self.layer_post_processor(nodes, key=key2)
         return nodes
